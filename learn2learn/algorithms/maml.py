@@ -121,7 +121,8 @@ class MAML(BaseLearner):
               epoch=None,
               allow_unused=None,
               allow_nograd=None,
-              clip_grad_max_norm=None):
+              clip_grad_max_norm=None,
+              return_grad_norm=False,):
         """
         **Description**
 
@@ -197,8 +198,18 @@ class MAML(BaseLearner):
                 for g in gradients:
                     if g is not None:
                         g.detach().mul_(clip_coef.to(g.device))
+
+        # For some experiment
+        if return_grad_norm:
+            norm_type = 2.0
+            device = gradients[0].device
+            total_norm = torch.norm(torch.stack(
+                [torch.norm(g.detach(), norm_type) for g in gradients if g is not None]
+            ).to(device), norm_type)
         # Update the module
         self.module = maml_update(self.module, self.lr, gradients)
+        if return_grad_norm:
+            return total_norm
 
     def clone(self, first_order=None, order_annealing_epoch=0, allow_unused=None, allow_nograd=None):
         """
