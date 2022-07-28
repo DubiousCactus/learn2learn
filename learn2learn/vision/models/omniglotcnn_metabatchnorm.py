@@ -193,8 +193,8 @@ class OmniglotFC_MetaBatchNorm(torch.nn.Module):
                 layer.restore_backup_stats()
 
 
-    def forward(self, x):
-        x = self.features(x)
+    def forward(self, x, inference=False):
+        x = self.features(x, inference=inference)
         x = self.classifier(x)
         return x
 
@@ -264,7 +264,7 @@ class OmniglotCNN_MetaBatchNorm(torch.nn.Module):
                 layer.restore_backup_stats()
 
 
-    def forward(self, x):
-        x = self.features(x)
+    def forward(self, x, inference=False):
+        x = self.features(x, inference=inference)
         x = self.classifier(x)
         return x
