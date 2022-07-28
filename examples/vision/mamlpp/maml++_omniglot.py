@@ -58,13 +58,13 @@ class MAMLppTrainer:
         torch.manual_seed(seed)
 
         # Dataset
-        print("[*] Loading mini-ImageNet...")
+        print("[*] Loading Omniglot...")
         (
             self._train_tasks,
             self._valid_tasks,
             self._test_tasks,
         ) = l2l.vision.benchmarks.get_tasksets(
-            "mini-imagenet",
+            "omniglot",
             train_samples=k_shots+n_queries,
             train_ways=ways,
             test_samples=k_shots+n_queries,
