@@ -48,11 +48,13 @@ class MAMLppTrainer:
         use_cuda=True,
         seed=42,
     ):
-        self._use_cuda = use_cuda
+        self._use_cuda = False
         self._device = torch.device("cpu")
-        if self._use_cuda and torch.cuda.device_count():
-            torch.cuda.manual_seed(seed)
-            self._device = torch.device("cuda")
+        if torch.cuda.is_available():
+            if use_cuda and torch.cuda.device_count():
+                torch.cuda.manual_seed(seed)
+                self._device = torch.device("cuda")
+                self._use_cuda = True
         print(f"[*] Using device: {self._device}")
         random.seed(seed)
         np.random.seed(seed)
@@ -115,17 +117,21 @@ class MAMLppTrainer:
         images, labels = batch
         task_size = self._k_shots + self._n_queries
         assert task_size <= images.shape[0], "K+N are smaller than the batch size!"
-        adaptation_indices = np.zeros(images.size(0), dtype=bool)
-        adaptation_indices[np.arange(self._k_shots*self._n_ways) * 2] = True
-        evaluation_indices = torch.from_numpy(~adaptation_indices)
-        adaptation_indices = torch.from_numpy(adaptation_indices)
+        # indices = torch.randperm(task_size)
+        # support_indices = indices[: self._k_shots]
+        # query_indices = indices[self._k_shots :]
+        support_indices = np.zeros(images.size(0), dtype=bool)
+        # TODO: Handle n_queries != k_shots
+        support_indices[np.arange(self._k_shots*self._n_ways) * 2] = True
+        query_indices = torch.from_numpy(~support_indices)
+        support_indices = torch.from_numpy(support_indices)
 
         return MetaBatch(
             (
-                images[adaptation_indices],
-                labels[adaptation_indices],
+                images[support_indices],
+                labels[support_indices],
             ),
-            (images[evaluation_indices], labels[evaluation_indices]),
+            (images[query_indices], labels[query_indices]),
         )
 
     def _training_step(
@@ -153,11 +159,8 @@ class MAMLppTrainer:
         # Adapt the model on the support set
         for step in range(self._steps):
             # forward + backward + optimize
-            print(s_inputs.shape, s_labels.shape)
             pred = learner(s_inputs)
-            print(pred.shape)
             support_loss = self._inner_criterion(pred, s_labels)
-            print(support_loss)
             learner.adapt(support_loss, first_order=not second_order)
             # Multi-Step Loss
             if msl:
