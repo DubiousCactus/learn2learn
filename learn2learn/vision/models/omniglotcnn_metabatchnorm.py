@@ -176,6 +176,23 @@ class OmniglotFC_MetaBatchNorm(torch.nn.Module):
         self.classifier = fc_init_(torch.nn.Linear(sizes[-1], output_size))
         self.input_size = input_size
 
+    def backup_stats(self):
+        """
+        Backup stored batch statistics before running a validation epoch.
+        """
+        for layer in self.features.modules():
+            if type(layer) is MetaBatchNorm:
+                layer.backup_stats()
+
+    def restore_backup_stats(self):
+        """
+        Reset stored batch statistics from the stored backup.
+        """
+        for layer in self.features.modules():
+            if type(layer) is MetaBatchNorm:
+                layer.restore_backup_stats()
+
+
     def forward(self, x):
         x = self.features(x)
         x = self.classifier(x)
