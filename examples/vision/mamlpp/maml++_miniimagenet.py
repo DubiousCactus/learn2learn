@@ -38,9 +38,9 @@ def accuracy(predictions, targets):
 class MAMLppTrainer:
     def __init__(
         self,
-        ways=20,
-        k_shots=5,
-        n_queries=5,
+        ways=5,
+        k_shots=1,
+        n_queries=1,
         steps=5,
         msl_epochs=25,
         DA_epochs=50,
@@ -207,7 +207,7 @@ class MAMLppTrainer:
         meta_lr=0.001,
         fast_lr=0.01,
         meta_bsz=16,
-        epochs=1,
+        epochs=150,
         val_interval=1,
     ):
         print("[*] Training...")
