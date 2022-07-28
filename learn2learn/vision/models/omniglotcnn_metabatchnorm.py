@@ -237,6 +237,8 @@ class OmniglotCNN_MetaBatchNorm(torch.nn.Module):
             max_pool=False,
             layers=layers,
         )
+        self.reshape1 = l2l.nn.Lambda(lambda x: x.view(-1, 1, 28, 28))
+        self.reshape2 = l2l.nn.Lambda(lambda x: x.mean(dim=[2, 3]))
         self.features = torch.nn.Sequential(
             l2l.nn.Lambda(lambda x: x.view(-1, 1, 28, 28)),
             self.base,
@@ -265,6 +267,9 @@ class OmniglotCNN_MetaBatchNorm(torch.nn.Module):
 
 
     def forward(self, x, inference=False):
-        x = self.features(x, inference=inference)
+        x = self.reshape1(x)
+        x = self.base(x, inference=inference)
+        x = self.reshape2(x)
+        x = l2l.nn.Flatten()(x)
         x = self.classifier(x)
         return x
