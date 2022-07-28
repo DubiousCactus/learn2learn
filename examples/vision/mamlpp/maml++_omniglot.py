@@ -39,9 +39,9 @@ def accuracy(predictions, targets):
 class MAMLppTrainer:
     def __init__(
         self,
-        ways=20,
-        k_shots=5,
-        n_queries=5,
+        ways=5,
+        k_shots=1,
+        n_queries=1,
         steps=5,
         msl_epochs=25,
         DA_epochs=50,
@@ -61,6 +61,8 @@ class MAMLppTrainer:
         torch.manual_seed(seed)
 
         # Dataset
+        # TODO: Load it my own way to use same params as MAML++.
+        # Look into learn2learn/vision/benchmarks/omniglot_benchmark.py
         print("[*] Loading Omniglot...")
         (
             self._train_tasks,
@@ -208,7 +210,7 @@ class MAMLppTrainer:
         meta_lr=0.001,
         fast_lr=0.01,
         meta_bsz=16,
-        epochs=100,
+        epochs=150,
         val_interval=1,
     ):
         print("[*] Training...")
