@@ -39,6 +39,11 @@ from .cnn4_metabatchnorm import (
     CNN4_MetaBatchNorm,
 )
 
+from .omniglotcnn_metabatchnorm import (
+    OmniglotFC_MetaBatchNorm,
+    OmniglotCNN_MetaBatchNorm,
+)
+
 from .resnet12 import ResNet12, ResNet12Backbone
 from .wrn28 import WRN28, WRN28Backbone
 

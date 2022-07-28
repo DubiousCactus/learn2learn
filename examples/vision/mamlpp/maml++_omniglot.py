@@ -22,6 +22,7 @@ from tqdm import tqdm
 from learn2learn.optim.transforms.layer_step_lr_transform import PerLayerPerStepLRTransform
 
 from learn2learn.vision.models.cnn4_metabatchnorm import CNN4_MetaBatchNorm
+from learn2learn.vision.models.omniglotcnn_metabatchnorm import OmniglotCNN_MetaBatchNorm
 
 
 MetaBatch = namedtuple("MetaBatch", "support query")
@@ -74,7 +75,7 @@ class MAMLppTrainer:
         print("[*] Done.")
 
         # Model
-        self._model = CNN4_MetaBatchNorm(ways, steps)
+        self._model = OmniglotCNN_MetaBatchNorm(ways, steps)
         if self._use_cuda:
             self._model.cuda()
 
@@ -82,6 +83,7 @@ class MAMLppTrainer:
         self._steps = steps
         self._k_shots = k_shots
         self._n_queries = n_queries
+        self._n_ways = ways
         self._inner_criterion = torch.nn.CrossEntropyLoss(reduction="mean")
 
         # Multi-Step Loss
@@ -113,15 +115,17 @@ class MAMLppTrainer:
         images, labels = batch
         task_size = self._k_shots + self._n_queries
         assert task_size <= images.shape[0], "K+N are smaller than the batch size!"
-        indices = torch.randperm(task_size)
-        support_indices = indices[: self._k_shots]
-        query_indices = indices[self._k_shots :]
+        adaptation_indices = np.zeros(images.size(0), dtype=bool)
+        adaptation_indices[np.arange(self._k_shots*self._n_ways) * 2] = True
+        evaluation_indices = torch.from_numpy(~adaptation_indices)
+        adaptation_indices = torch.from_numpy(adaptation_indices)
+
         return MetaBatch(
             (
-                images[support_indices],
-                labels[support_indices],
+                images[adaptation_indices],
+                labels[adaptation_indices],
             ),
-            (images[query_indices], labels[query_indices]),
+            (images[evaluation_indices], labels[evaluation_indices]),
         )
 
     def _training_step(
@@ -149,8 +153,11 @@ class MAMLppTrainer:
         # Adapt the model on the support set
         for step in range(self._steps):
             # forward + backward + optimize
+            print(s_inputs.shape, s_labels.shape)
             pred = learner(s_inputs)
+            print(pred.shape)
             support_loss = self._inner_criterion(pred, s_labels)
+            print(support_loss)
             learner.adapt(support_loss, first_order=not second_order)
             # Multi-Step Loss
             if msl:
@@ -198,7 +205,7 @@ class MAMLppTrainer:
         meta_lr=0.001,
         fast_lr=0.01,
         meta_bsz=16,
-        epochs=1,
+        epochs=100,
         val_interval=1,
     ):
         print("[*] Training...")

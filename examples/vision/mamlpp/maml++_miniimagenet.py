@@ -82,6 +82,7 @@ class MAMLppTrainer:
         self._steps = steps
         self._k_shots = k_shots
         self._n_queries = n_queries
+        self._n_ways = ways
         self._inner_criterion = torch.nn.CrossEntropyLoss(reduction="mean")
 
         # Multi-Step Loss
@@ -113,9 +114,14 @@ class MAMLppTrainer:
         images, labels = batch
         task_size = self._k_shots + self._n_queries
         assert task_size <= images.shape[0], "K+N are smaller than the batch size!"
-        indices = torch.randperm(task_size)
-        support_indices = indices[: self._k_shots]
-        query_indices = indices[self._k_shots :]
+        # indices = torch.randperm(task_size)
+        # support_indices = indices[: self._k_shots]
+        # query_indices = indices[self._k_shots :]
+        support_indices = np.zeros(images.size(0), dtype=bool)
+        support_indices[np.arange(self._k_shots*self._n_ways) * 2] = True
+        query_indices = torch.from_numpy(~support_indices)
+        query_indices = torch.from_numpy(support_indices)
+
         return MetaBatch(
             (
                 images[support_indices],
