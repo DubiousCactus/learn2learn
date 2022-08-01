@@ -16,13 +16,17 @@ import numpy as np
 import random
 import torch
 
-from collections import namedtuple
+from collections import deque, namedtuple
 from typing import Tuple
 from tqdm import tqdm
-from learn2learn.optim.transforms.layer_step_lr_transform import PerLayerPerStepLRTransform
+from learn2learn.optim.transforms.layer_step_lr_transform import (
+    PerLayerPerStepLRTransform,
+)
 
 from learn2learn.vision.models.cnn4_metabatchnorm import CNN4_MetaBatchNorm
-from learn2learn.vision.models.omniglotcnn_metabatchnorm import OmniglotCNN_MetaBatchNorm
+from learn2learn.vision.models.omniglotcnn_metabatchnorm import (
+    OmniglotCNN_MetaBatchNorm,
+)
 
 
 MetaBatch = namedtuple("MetaBatch", "support query")
@@ -70,9 +74,9 @@ class MAMLppTrainer:
             self._test_tasks,
         ) = l2l.vision.benchmarks.get_tasksets(
             "omniglot",
-            train_samples=k_shots+n_queries,
+            train_samples=k_shots + n_queries,
             train_ways=ways,
-            test_samples=k_shots+n_queries,
+            test_samples=k_shots + n_queries,
             test_ways=ways,
             root="~/data",
         )
@@ -124,7 +128,7 @@ class MAMLppTrainer:
         # query_indices = indices[self._k_shots :]
         support_indices = np.zeros(images.size(0), dtype=bool)
         # TODO: Handle n_queries != k_shots
-        support_indices[np.arange(self._k_shots*self._n_ways) * 2] = True
+        support_indices[np.arange(self._k_shots * self._n_ways) * 2] = True
         query_indices = torch.from_numpy(~support_indices)
         support_indices = torch.from_numpy(support_indices)
 
@@ -145,7 +149,7 @@ class MAMLppTrainer:
     ) -> Tuple[torch.Tensor, float]:
         s_inputs, s_labels = batch.support
         q_inputs, q_labels = batch.query
-        query_loss = torch.tensor(.0, device=self._device)
+        query_loss = torch.tensor(0.0, device=self._device)
 
         if self._use_cuda:
             s_inputs = s_inputs.float().cuda(device=self._device)
@@ -214,7 +218,9 @@ class MAMLppTrainer:
         val_interval=1,
     ):
         print("[*] Training...")
-        transform = PerLayerPerStepLRTransform(fast_lr, self._steps, self._model, ["conv"])
+        transform = PerLayerPerStepLRTransform(
+            fast_lr, self._steps, self._model, ["conv"]
+        )
         # Setting adapt_transform=True means that the transform will be updated in
         # the *adapt* function, which is not what we want. We want it to compute gradients during
         # eval_loss.backward() only, so that it's updated in opt.step().
@@ -231,12 +237,15 @@ class MAMLppTrainer:
         iter_per_epoch = (
             train_samples // (meta_bsz * (self._k_shots + self._n_queries))
         ) + 1
-        print(f"[*] Training with {iter_per_epoch} iterations/epoch with {train_samples} total training samples")
+        print(
+            f"[*] Training with {iter_per_epoch} iterations/epoch with {train_samples} total training samples"
+        )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             opt,
             T_max=epochs * iter_per_epoch,
             eta_min=0.00001,
         )
+        best_5 = deque(maxlen=5)
 
         for epoch in range(epochs):
             epoch_meta_train_loss, epoch_meta_train_acc = 0.0, 0.0
@@ -295,6 +304,24 @@ class MAMLppTrainer:
                 print(f"Meta-validation Loss: {meta_val_loss:.6f}")
                 print(f"Meta-validation Accuracy: {meta_val_acc:.6f}")
                 self._model.restore_backup_stats()
+                lower = False
+                for el in best_5:
+                    if meta_val_loss < el:
+                        lower = True
+                        break
+                if len(best_5) < best_5.maxlen or lower:
+                    best_5.append(meta_val_loss)
+                    torch.save(
+                        {
+                            "model_state": self._model.state_dict(),
+                            "optim_state": opt.state_dict(),
+                            "transform_state": transform.state_dict(),
+                            "epoch": epoch,
+                            "loss": meta_val_loss,
+                        },
+                        f"epoch_{epoch}-loss_{meta_val_loss:06f}.ckpt",
+                    )
+
             print("============================================")
 
         return self._model.state_dict(), transform.state_dict()
@@ -308,7 +335,9 @@ class MAMLppTrainer:
         meta_bsz=5,
     ):
         self._model.load_state_dict(model_state_dict)
-        transform = PerLayerPerStepLRTransform(fast_lr, self._steps, self._model, ["conv"])
+        transform = PerLayerPerStepLRTransform(
+            fast_lr, self._steps, self._model, ["conv"]
+        )
         transform.load_state_dict(trasnform_state_dict)
         # Setting adapt_transform=True means that the transform will be updated in
         # the *adapt* function, which is not what we want. We want it to compute gradients during
@@ -337,4 +366,3 @@ if __name__ == "__main__":
     mamlPlusPlus = MAMLppTrainer()
     model_state_dict, transform_state_dict = mamlPlusPlus.train()
     mamlPlusPlus.test(model_state_dict, transform_state_dict)
-
