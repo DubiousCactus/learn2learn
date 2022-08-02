@@ -15,15 +15,15 @@ import learn2learn as l2l
 import numpy as np
 import random
 import torch
+import os
 
-from collections import deque, namedtuple
+from collections import namedtuple
 from typing import Tuple
 from tqdm import tqdm
 from learn2learn.optim.transforms.layer_step_lr_transform import (
     PerLayerPerStepLRTransform,
 )
 
-from learn2learn.vision.models.cnn4_metabatchnorm import CNN4_MetaBatchNorm
 from learn2learn.vision.models.omniglotcnn_metabatchnorm import (
     OmniglotCNN_MetaBatchNorm,
 )
@@ -218,6 +218,8 @@ class MAMLppTrainer:
         val_interval=1,
     ):
         print("[*] Training...")
+        model_dir = "model"
+        os.makedirs(model_dir, exist_ok=True)
         transform = PerLayerPerStepLRTransform(
             fast_lr, self._steps, self._model, ["conv"]
         )
@@ -245,7 +247,7 @@ class MAMLppTrainer:
             T_max=epochs * iter_per_epoch,
             eta_min=0.00001,
         )
-        best_5 = deque(maxlen=5)
+        best_5 = {}
 
         for epoch in range(epochs):
             epoch_meta_train_loss, epoch_meta_train_acc = 0.0, 0.0
@@ -304,13 +306,17 @@ class MAMLppTrainer:
                 print(f"Meta-validation Loss: {meta_val_loss:.6f}")
                 print(f"Meta-validation Accuracy: {meta_val_acc:.6f}")
                 self._model.restore_backup_stats()
-                lower = False
-                for el in best_5:
-                    if meta_val_loss < el:
-                        lower = True
-                        break
-                if len(best_5) < best_5.maxlen or lower:
-                    best_5.append(meta_val_loss)
+                # If the new loss is lower, this reduces to an empty list:
+                lower = list(filter(lambda a: a < meta_val_loss, best_5.keys())) == []
+                if len(best_5) < 5 or lower:
+                    fname = f"epoch_{epoch}-loss_{meta_val_loss:06f}.ckpt"
+                    if len(best_5) == 5:
+                        sorted_5 = list(best_5.keys()).sort()
+                        del_fname = best_5[sorted_5[-1]] # Worst model
+                        print(f"[*] Deleting model {del_fname}")
+                        os.remove(os.path.join(model_dir, del_fname))
+                    best_5[meta_val_loss] = fname
+                    path = os.path.join(model_dir, fname)
                     torch.save(
                         {
                             "model_state": self._model.state_dict(),
@@ -319,8 +325,9 @@ class MAMLppTrainer:
                             "epoch": epoch,
                             "loss": meta_val_loss,
                         },
-                        f"epoch_{epoch}-loss_{meta_val_loss:06f}.ckpt",
+                        path,
                     )
+                    print(f" Saved new model at: {path}")
 
             print("============================================")
 
