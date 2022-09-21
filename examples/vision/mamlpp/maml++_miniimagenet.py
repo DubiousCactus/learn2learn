@@ -13,6 +13,7 @@ Example implementation of MAML++ on miniImageNet.
 
 import learn2learn as l2l
 import numpy as np
+import argparse
 import random
 import wandb
 import torch
@@ -350,7 +351,14 @@ class MAMLppTrainer:
 
 if __name__ == "__main__":
     wandb.init(project="MAML++ benchmark miniImageNet")
-    mamlPlusPlus = MAMLppTrainer(steps=1)
-    model_state_dict, transform_state_dict = mamlPlusPlus.train(meta_bsz=1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--shots", type=int, default=1)
+    parser.add_argument("--ways", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=150)
+    parser.add_argument("--steps", type=int, default=5)
+    args = parser.parse_args()
+    mamlPlusPlus = MAMLppTrainer(ways=args.ways, k_shots=args.shots, n_queries=args.shots,
+            steps=args.steps)
+    model_state_dict, transform_state_dict = mamlPlusPlus.train(epochs=args.epochs)
     mamlPlusPlus.test(model_state_dict, transform_state_dict)
 
