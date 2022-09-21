@@ -248,7 +248,7 @@ class MAMLppTrainer:
 
         for epoch in range(epochs):
             epoch_meta_train_loss, epoch_meta_train_acc = 0.0, 0.0
-            for _ in tqdm(range(10)):
+            for _ in tqdm(range(iter_per_epoch)):
                 opt.zero_grad()
                 meta_train_losses, meta_train_accs = [], []
 
