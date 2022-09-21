@@ -14,6 +14,7 @@ Example implementation of MAML++ on miniImageNet.
 import learn2learn as l2l
 import numpy as np
 import random
+import wandb
 import torch
 
 from collections import namedtuple
@@ -210,6 +211,15 @@ class MAMLppTrainer:
         epochs=150,
         val_interval=1,
     ):
+        wandb.config = {
+          "fast_learning_rate": fast_lr,
+          "meta_learning_rate": meta_lr,
+          "epochs": epochs,
+          "meta_batch_size": meta_bsz,
+          "n_ways": self._n_ways,
+          "k_shots": self._k_shots,
+          "n_queries": self._n_queries
+        }
         print("[*] Training...")
         transform = PerLayerPerStepLRTransform(fast_lr, self._steps, self._model, ["conv"])
         # Setting adapt_transform=True means that the transform will be updated in
@@ -237,7 +247,7 @@ class MAMLppTrainer:
 
         for epoch in range(epochs):
             epoch_meta_train_loss, epoch_meta_train_acc = 0.0, 0.0
-            for _ in tqdm(range(iter_per_epoch)):
+            for _ in tqdm(range(10)):
                 opt.zero_grad()
                 meta_train_losses, meta_train_accs = [], []
 
@@ -273,6 +283,10 @@ class MAMLppTrainer:
             print(f"==========[Epoch {epoch}]==========")
             print(f"Meta-training Loss: {epoch_meta_train_loss:.6f}")
             print(f"Meta-training Acc: {epoch_meta_train_acc:.6f}")
+            wandb.log({
+                "meta-training-loss": epoch_meta_train_loss,
+                "meta-training-acc": epoch_meta_train_acc
+                }, step=epoch)
 
             # ======= Validation ========
             if (epoch + 1) % val_interval == 0:
@@ -291,6 +305,10 @@ class MAMLppTrainer:
                 meta_val_acc = float(torch.Tensor(meta_val_accs).mean().item())
                 print(f"Meta-validation Loss: {meta_val_loss:.6f}")
                 print(f"Meta-validation Accuracy: {meta_val_acc:.6f}")
+                wandb.log({
+                    "meta-validation-loss": meta_val_loss,
+                    "meta-validation-acc": meta_val_acc
+                    }, step=epoch)
                 self._model.restore_backup_stats()
             print("============================================")
 
@@ -331,7 +349,8 @@ class MAMLppTrainer:
 
 
 if __name__ == "__main__":
-    mamlPlusPlus = MAMLppTrainer()
-    model_state_dict, transform_state_dict = mamlPlusPlus.train()
+    wandb.init(project="MAML++ benchmark miniImageNet")
+    mamlPlusPlus = MAMLppTrainer(steps=1)
+    model_state_dict, transform_state_dict = mamlPlusPlus.train(meta_bsz=1)
     mamlPlusPlus.test(model_state_dict, transform_state_dict)
 
