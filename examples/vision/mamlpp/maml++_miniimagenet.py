@@ -343,15 +343,12 @@ class MAMLppTrainer:
 
     def test(
         self,
-        model_state_dict,
-        trasnform_state_dict,
-        meta_lr=0.001,
-        fast_lr=0.01,
-        meta_bsz=5,
+        saved_model: str,
     ):
-        self._model.load_state_dict(model_state_dict)
-        transform = PerLayerPerStepLRTransform(fast_lr, self._steps, self._model, ["conv"])
-        transform.load_state_dict(trasnform_state_dict)
+        model = torch.load(saved_model)
+        self._model.load_state_dict(model["model_state"])
+        transform = PerLayerPerStepLRTransform(1e-3, self._steps, self._model, ["conv"])
+        transform.load_state_dict(model["transform_state"])
         # Setting adapt_transform=True means that the transform will be updated in
         # the *adapt* function, which is not what we want. We want it to compute gradients during
         # eval_loss.backward() only, so that it's updated in opt.step().
@@ -382,9 +379,14 @@ if __name__ == "__main__":
     parser.add_argument("--ways", type=int, default=5)
     parser.add_argument("--epochs", type=int, default=150)
     parser.add_argument("--steps", type=int, default=5)
+    parser.add_argument("--test", action='store_true')
+    parser.add_argument("--saved_model", type=str, required=False)
     args = parser.parse_args()
     mamlPlusPlus = MAMLppTrainer(ways=args.ways, k_shots=args.shots, n_queries=args.shots,
             steps=args.steps)
-    model_state_dict, transform_state_dict = mamlPlusPlus.train(epochs=args.epochs)
-    mamlPlusPlus.test(model_state_dict, transform_state_dict)
+    if not args.test:
+        model_state_dict, transform_state_dict = mamlPlusPlus.train(epochs=args.epochs)
+    else:
+        assert args.saved_model is not None, "--saved_model argument required"
+        mamlPlusPlus.test(args.saved_model)
 
