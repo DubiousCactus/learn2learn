@@ -17,6 +17,7 @@ import argparse
 import random
 import wandb
 import torch
+import os
 
 from collections import namedtuple
 from typing import Tuple
@@ -222,6 +223,8 @@ class MAMLppTrainer:
           "n_queries": self._n_queries
         }
         print("[*] Training...")
+        model_dir = "model"
+        os.makedirs(model_dir, exist_ok=True)
         transform = PerLayerPerStepLRTransform(fast_lr, self._steps, self._model, ["conv"])
         # Setting adapt_transform=True means that the transform will be updated in
         # the *adapt* function, which is not what we want. We want it to compute gradients during
@@ -245,6 +248,7 @@ class MAMLppTrainer:
             T_max=epochs * iter_per_epoch,
             eta_min=0.00001,
         )
+        best_5 = {}
 
         for epoch in range(epochs):
             epoch_meta_train_loss, epoch_meta_train_acc = 0.0, 0.0
@@ -311,6 +315,28 @@ class MAMLppTrainer:
                     "meta-validation-acc": meta_val_acc
                     }, step=epoch)
                 self._model.restore_backup_stats()
+                # If the new loss is lower, this reduces to an empty list:
+                lower = list(filter(lambda a: a < meta_val_loss, best_5.keys())) == []
+                if len(best_5) < 5 or lower:
+                    fname = f"epoch_{epoch}-loss_{meta_val_loss:06f}.ckpt"
+                    if len(best_5) == 5:
+                        sorted_5 = list(best_5.keys()).sort()
+                        del_fname = best_5[sorted_5[-1]] # Worst model
+                        print(f"[*] Deleting model {del_fname}")
+                        os.remove(os.path.join(model_dir, del_fname))
+                    best_5[meta_val_loss] = fname
+                    path = os.path.join(model_dir, fname)
+                    torch.save(
+                        {
+                            "model_state": self._model.state_dict(),
+                            "optim_state": opt.state_dict(),
+                            "transform_state": transform.state_dict(),
+                            "epoch": epoch,
+                            "loss": meta_val_loss,
+                        },
+                        path,
+                    )
+                    print(f" Saved new model at: {path}")
             print("============================================")
 
         return self._model.state_dict(), transform.state_dict()
