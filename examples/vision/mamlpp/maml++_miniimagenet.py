@@ -359,6 +359,7 @@ class MAMLppTrainer:
             adapt_transform=False,
             pass_param_names=True,
         )
+        mamlpp.eval()
 
         meta_losses, meta_accs = [], []
         for _ in tqdm(range(test_samples // tasks)):
