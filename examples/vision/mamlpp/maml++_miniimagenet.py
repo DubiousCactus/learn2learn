@@ -373,7 +373,6 @@ class MAMLppTrainer:
 
 
 if __name__ == "__main__":
-    wandb.init(project="MAML++ benchmark miniImageNet")
     parser = argparse.ArgumentParser()
     parser.add_argument("--shots", type=int, default=1)
     parser.add_argument("--ways", type=int, default=5)
@@ -385,6 +384,7 @@ if __name__ == "__main__":
     mamlPlusPlus = MAMLppTrainer(ways=args.ways, k_shots=args.shots, n_queries=args.shots,
             steps=args.steps)
     if not args.test:
+        wandb.init(project="MAML++ benchmark miniImageNet")
         model_state_dict, transform_state_dict = mamlPlusPlus.train(epochs=args.epochs)
     else:
         assert args.saved_model is not None, "--saved_model argument required"
