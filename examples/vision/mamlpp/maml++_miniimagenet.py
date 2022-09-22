@@ -356,6 +356,7 @@ class MAMLppTrainer:
             self._model,
             transform,
             lr=1.0,
+            allow_nograd=True,
             adapt_transform=False,
             pass_param_names=True,
         )
