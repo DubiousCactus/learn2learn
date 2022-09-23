@@ -320,7 +320,7 @@ class MAMLppTrainer:
                 if len(best_5) < 5 or lower:
                     fname = f"epoch_{epoch}-loss_{meta_val_loss:06f}.ckpt"
                     if len(best_5) == 5:
-                        sorted_5 = list(best_5.keys()).sort()
+                        sorted_5 = sorted(list(best_5.keys()))
                         del_fname = best_5[sorted_5[-1]] # Worst model
                         print(f"[*] Deleting model {del_fname}")
                         os.remove(os.path.join(model_dir, del_fname))
@@ -370,8 +370,8 @@ class MAMLppTrainer:
             meta_accs.append(acc)
         loss = float(torch.Tensor(meta_losses).mean().item())
         acc = float(torch.Tensor(meta_accs).mean().item())
-        print(f"Meta-training Loss: {loss:.6f}")
-        print(f"Meta-training Acc: {acc:.6f}")
+        print(f"Test loss: {loss:.6f}")
+        print(f"Test acc: {acc:.6f}")
 
 
 if __name__ == "__main__":
